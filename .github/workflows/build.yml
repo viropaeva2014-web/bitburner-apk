@@ -72,7 +72,7 @@ jobs:
               }
               signingConfigs {
                   release {
-                      storeFile file('../android.keystore')
+                      storeFile file('android.keystore')
                       storePassword System.getenv("KEYSTORE_PASSWORD")
                       keyAlias System.getenv("KEY_ALIAS")
                       keyPassword System.getenv("KEY_PASSWORD")
@@ -128,6 +128,10 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android-app
+          
+          # ВОТ ОНА! Копируем ключ ВНУТРЬ папки проекта
+          cp ../android.keystore .
+          
           wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle-8.2-bin.zip
           chmod +x gradle-8.2/bin/gradle
