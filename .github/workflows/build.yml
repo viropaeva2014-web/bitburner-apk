@@ -51,16 +51,28 @@ jobs:
         run: |
           bubblewrap update --skipVersionUpgrade
 
-      - name: Build APK
-        run: |
-          bubblewrap build \
-            --signingKeyPath=android.keystore \
-            --signingKeyAlias=${{ secrets.KEY_ALIAS }} \
-            --keystorePassword=${{ secrets.KEYSTORE_PASSWORD }} \
-            --keyPassword=${{ secrets.KEY_PASSWORD }}
+- name: Generate Android project and Build APK
+  run: |
+    # 1. Генерируем проект (теперь у Bubblewrap есть все пути)
+    bubblewrap init --manifest="https://bitburner-official.github.io/manifest.json" --directory=android-app
+    
+    # 2. Переходим в папку проекта
+    cd android-app
+    
+    # 3. Настраиваем ключи для подписи (передаем их напрямую в Gradle)
+    echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > keystore.properties
+    echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> keystore.properties
+    echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> keystore.properties
+    echo "storeFile=../android.keystore" >> keystore.properties
+    
+    # 4. Собираем релизный APK
+    ./gradlew assembleRelease
+    
+    # 5. Копируем готовый APK в корень для загрузки
+    cp app/build/outputs/apk/release/app-release-signed.apk ../bitburner.apk || cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: bitburner-apk
-          path: '*.apk'
+- name: Upload APK
+  uses: actions/upload-artifact@v4
+  with:
+    name: bitburner-apk
+    path: bitburner.apk
