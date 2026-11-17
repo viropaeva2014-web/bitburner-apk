@@ -28,16 +28,16 @@ jobs:
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
 
-      - name: Build Android App (Всё внутри папки)
+      - name: Build APK from inside android-app
         run: |
-          # 1. Создаем папку и сразу заходим в неё
+          # 1. Создаем папку android-app и ЗАХОДИМ в нее
           mkdir -p android-app
           cd android-app
           
-          # 2. Декодируем ключ ПРЯМО СЮДА
+          # 2. Кладем ключ прямо сюда
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
           
-          # 3. Создаем все файлы проекта
+          # 3. Создаем структуру проекта
           mkdir -p app/src/main
           
           cat << 'EOF' > settings.gradle
@@ -75,6 +75,7 @@ jobs:
               }
               signingConfigs {
                   release {
+                      # ТУТ БЕЗ ВСЯКИХ ЗАМЕН. Ключ лежит в этой же папке.
                       storeFile file('android.keystore')
                       storePassword System.getenv("KEYSTORE_PASSWORD")
                       keyAlias System.getenv("KEY_ALIAS")
@@ -125,13 +126,14 @@ jobs:
           }
           EOF
 
-          # 4. Скачиваем Gradle и собираем (находясь в той же папке!)
+          # 4. Скачиваем Gradle и собираем, находясь ВНУТРИ папки android-app
           wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle-8.2-bin.zip
           chmod +x gradle-8.2/bin/gradle
+          
           ./gradle-8.2/bin/gradle assembleRelease
           
-          # 5. Вытаскиваем готовый APK наружу
+          # 5. Копируем готовый файл обратно наружу (в корень репозитория)
           cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
