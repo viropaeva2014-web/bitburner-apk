@@ -1,0 +1,53 @@
+name: Build Bitburner APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
+
+      - name: Generate Android project from manifest
+        run: |
+          # update генерирует проект на основе twa-manifest.json без вопросов
+          bubblewrap update --skipVersionUpgrade
+
+      - name: Build APK
+        run: |
+          bubblewrap build \
+            --signingKeyPath=android.keystore \
+            --signingKeyAlias=${{ secrets.KEY_ALIAS }} \
+            --keystorePassword=${{ secrets.KEYSTORE_PASSWORD }} \
+            --keyPassword=${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitburner-apk
+          path: '*.apk'
