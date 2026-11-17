@@ -34,10 +34,8 @@ jobs:
 
       - name: Create Android Project Structure
         run: |
-          # Создаем структуру папок
           mkdir -p android-app/app/src/main
           
-          # 1. Настройки Gradle
           cat << 'EOF' > android-app/settings.gradle
           rootProject.name = "BitburnerWrapper"
           include ':app'
@@ -53,7 +51,13 @@ jobs:
           }
           EOF
 
-          # 2. Настройки App
+          # Добавляем gradle.properties, чтобы Gradle не сошел с ума от нехватки памяти
+          cat << 'EOF' > android-app/gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
+
           cat << 'EOF' > android-app/app/build.gradle
           apply plugin: 'com.android.application'
 
@@ -84,7 +88,6 @@ jobs:
           dependencies {}
           EOF
 
-          # 3. Манифест приложения
           cat << 'EOF' > android-app/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -103,7 +106,6 @@ jobs:
           </manifest>
           EOF
 
-          # 4. Код Java (Просто открывает сайт игры)
           cat << 'EOF' > android-app/app/src/main/MainActivity.java
           package com.bitburner.app;
           import android.app.Activity;
@@ -127,12 +129,14 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android-app
-          # Скачиваем Gradle
-          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-          unzip -q gradle-8.5-bin.zip
-          chmod +x gradle-8.5/bin/gradle
-          # Собираем
-          ./gradle-8.5/bin/gradle assembleRelease
+          # Используем стабильную версию Gradle 8.2
+          wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          unzip -q gradle-8.2-bin.zip
+          chmod +x gradle-8.2/bin/gradle
+          
+          # Запускаем сборку
+          ./gradle-8.2/bin/gradle assembleRelease
+          
           # Копируем готовый APK наверх
           cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
         env:
