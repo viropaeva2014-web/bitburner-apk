@@ -19,7 +19,15 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          # Напрямую скачиваем command line tools и принимаем лицензии
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools latest
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,9 +41,14 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
+      - name: Init Bubblewrap config
+        run: |
+          # Создаем конфиг, чтобы Bubblewrap не пытался спрашивать пути в консоли
+          mkdir -p $HOME/.bubblewrap
+          echo '{"jdkPath":"/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.10-7/x64","androidSdkPath":"'"$HOME"'/android-sdk"}' > $HOME/.bubblewrap/config.json
+
       - name: Generate Android project from manifest
         run: |
-          # update генерирует проект на основе twa-manifest.json без вопросов
           bubblewrap update --skipVersionUpgrade
 
       - name: Build APK
