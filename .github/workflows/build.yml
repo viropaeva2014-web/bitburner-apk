@@ -28,43 +28,117 @@ jobs:
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
-
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
-      - name: Init Bubblewrap config
+      - name: Create Android Project Structure
         run: |
-          mkdir -p $HOME/.bubblewrap
-          echo '{"jdkPath":"/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.10-7/x64","androidSdkPath":"'"$HOME"'/android-sdk"}' > $HOME/.bubblewrap/config.json
+          # Создаем структуру папок
+          mkdir -p android-app/app/src/main
+          
+          # 1. Настройки Gradle
+          cat << 'EOF' > android-app/settings.gradle
+          rootProject.name = "BitburnerWrapper"
+          include ':app'
+          EOF
 
-      - name: Generate Android project and Build APK
+          cat << 'EOF' > android-app/build.gradle
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }
+          }
+          allprojects {
+              repositories { google(); mavenCentral() }
+          }
+          EOF
+
+          # 2. Настройки App
+          cat << 'EOF' > android-app/app/build.gradle
+          apply plugin: 'com.android.application'
+
+          android {
+              namespace 'com.bitburner.app'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.bitburner.app"
+                  minSdk 23
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              signingConfigs {
+                  release {
+                      storeFile file('../android.keystore')
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          dependencies {}
+          EOF
+
+          # 3. Манифест приложения
+          cat << 'EOF' > android-app/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:label="Bitburner"
+                  android:theme="@android:style/Theme.NoTitleBar">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # 4. Код Java (Просто открывает сайт игры)
+          cat << 'EOF' > android-app/app/src/main/MainActivity.java
+          package com.bitburner.app;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView webView = new WebView(this);
+                  webView.getSettings().setJavaScriptEnabled(true);
+                  webView.getSettings().setDomStorageEnabled(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("https://bitburner-official.github.io/");
+                  setContentView(webView);
+              }
+          }
+          EOF
+
+      - name: Build APK with Gradle
         run: |
-          # 1. Генерируем проект из манифеста. 
-          # Флаг --directory создает папку android-app и кладет файлы туда.
-          bubblewrap init --manifest="https://bitburner-official.github.io/manifest.json" --directory=android-app
-          
-          # 2. Переходим в папку проекта
           cd android-app
-          
-          # 3. Настраиваем ключи для подписи
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > keystore.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> keystore.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> keystore.properties
-          echo "storeFile=../android.keystore" >> keystore.properties
-          
-          # 4. Собираем релизный APK
-          ./gradlew assembleRelease
-          
-          # 5. Копируем готовый APK в корень для загрузки
-          cp app/build/outputs/apk/release/app-release-signed.apk ../bitburner.apk || cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
+          # Скачиваем Gradle
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q gradle-8.5-bin.zip
+          chmod +x gradle-8.5/bin/gradle
+          # Собираем
+          ./gradle-8.5/bin/gradle assembleRelease
+          # Копируем готовый APK наверх
+          cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
