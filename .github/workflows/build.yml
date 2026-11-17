@@ -51,7 +51,6 @@ jobs:
           }
           EOF
 
-          # Добавляем gradle.properties, чтобы Gradle не сошел с ума от нехватки памяти
           cat << 'EOF' > android-app/gradle.properties
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           android.useAndroidX=true
@@ -129,15 +128,12 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android-app
-          # Используем стабильную версию Gradle 8.2
           wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle-8.2-bin.zip
           chmod +x gradle-8.2/bin/gradle
           
-          # Запускаем сборку
           ./gradle-8.2/bin/gradle assembleRelease
           
-          # Копируем готовый APK наверх
           cp app/build/outputs/apk/release/app-release.apk ../bitburner.apk
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
