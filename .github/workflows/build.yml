@@ -28,14 +28,15 @@ jobs:
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
 
-      - name: Decode Keystore
+      - name: Decode Keystore and Prepare Folders
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.keystore
+          # Создаем папку проекта СРАЗУ
+          mkdir -p android-app/app/src/main
+          # Декодируем ключ и кладем его ВНУТРЬ папки android-app
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android-app/android.keystore
 
       - name: Create Android Project Structure
         run: |
-          mkdir -p android-app/app/src/main
-          
           cat << 'EOF' > android-app/settings.gradle
           rootProject.name = "BitburnerWrapper"
           include ':app'
@@ -72,6 +73,7 @@ jobs:
               }
               signingConfigs {
                   release {
+                      # ТЕПЕРЬ КЛЮЧ ЛЕЖИТ РЯДОМ, БЕЗ ВСЯКИХ ../
                       storeFile file('android.keystore')
                       storePassword System.getenv("KEYSTORE_PASSWORD")
                       keyAlias System.getenv("KEY_ALIAS")
@@ -128,9 +130,6 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android-app
-          
-          # ВОТ ОНА! Копируем ключ ВНУТРЬ папки проекта
-          cp ../android.keystore .
           
           wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle-8.2-bin.zip
